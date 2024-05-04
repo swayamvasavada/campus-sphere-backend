@@ -133,6 +133,75 @@ async function resetPassword(req, res, next) {
     }
 }
 
+async function requestReset(req, res, next) {
+    const email = req.body.email;
+    const userData = await db.getDb().collection('users').findOne({ email: email });
+
+    console.log(userData);
+    console.log(email);
+
+    if (!userData) {
+        return res.status(404).json({
+            message: 'User does not exists',
+            hasError: true
+        });
+    }
+
+    try {
+        const token = jwt.sign({ email: userData.email }, 'super-secret', { expiresIn: 15 * 60 });
+        const mailOptions = {
+            from: 'Campus Sphere Technical Team',
+            to: email,
+            subject: 'Reset link for password!',
+            text: `Reset link for Campus Sphere account is ${token}`
+        };
+
+        transporter.sendMail(mailOptions, function (error, info) {
+            if (error) {
+                console.log(error);
+                return res.json({
+                    message: 'Unfortunately! We could not reset your password at a moment!',
+                    hasError: true
+                })
+            } else {
+                console.log('Email sent: ' + info.response);
+                return res.json({
+                    message: 'We have sent you reset link on email'
+                });
+            }
+        });
+    } catch (error) {
+        console.log(error);
+        next();
+    }
+}
+
+async function resetPassword(req, res, next) {
+    const resetToken = req.params.token;
+    const formData = req.body;
+
+    let userEmail;
+    jwt.verify(resetToken, 'super-secret', async function (err, decode) {
+        if (err) {
+            console.log(err);
+            return res.json({ message: 'Reset link expired!' });
+        }
+
+        userEmail = decode.email;
+        console.log(userEmail);
+    });
+
+    try {
+        const hasedPassword = await bcrypt.hash(formData.password, 12);
+        const result = await db.getDb().collection('users').updateOne({ email: userEmail }, { $set: { password: hasedPassword } });
+
+        res.json({ message: "Password reseted"});
+    } catch (error) {
+        console.log(error);
+        next();
+    }
+}
+
 module.exports = {
     login: login,
     requestReset: requestReset,
