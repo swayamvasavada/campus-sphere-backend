@@ -148,12 +148,26 @@ async function requestReset(req, res, next) {
     }
 
     try {
-        const token = jwt.sign({ email: userData.email }, 'super-secret', { expiresIn: 15 * 60 });
+        const resetToken = jwt.sign({ email: userData.email }, 'super-secret', { expiresIn: 15 * 60 });
         const mailOptions = {
             from: 'Campus Sphere Technical Team',
             to: email,
             subject: 'Reset link for password!',
-            text: `Reset link for Campus Sphere account is ${token}`
+            html: `<!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Reset password</title>
+            </head>
+            <body>
+                <p>Dear User,</p>
+                <p>We received a request to reset your password. If you made this request, please click the link below to reset your password:</p>
+                <p><a href="http://localhost:3000/reset-password/${resetToken}">Reset Password</a></p>
+                <p>The link will expire in 15 minutes. If you did not request a password reset, you can safely ignore this email.</p>
+                <p>Best regards,<br>Campus Sphere</p>
+            </body>
+            </html>`
         };
 
         transporter.sendMail(mailOptions, function (error, info) {
@@ -195,7 +209,7 @@ async function resetPassword(req, res, next) {
         const hasedPassword = await bcrypt.hash(formData.password, 12);
         const result = await db.getDb().collection('users').updateOne({ email: userEmail }, { $set: { password: hasedPassword } });
 
-        res.json({ message: "Password reseted"});
+        res.json({ message: "Password reseted" });
     } catch (error) {
         console.log(error);
         next();
