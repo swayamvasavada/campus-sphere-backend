@@ -106,7 +106,7 @@ router.post('/issue-notice', async function (req, res, next) {
             to: `${user.email}`, // Recipient email address
             subject: 'New Notice: Important Update from Campus Sphere', // Subject line
             text: 'There is new notice for you. This notice is sent by Campus Sphere.', // Plain text body
-            html: '<p>There is new notice for you. This notice is sent by Campus Sphere.</p>, <a href="http://localhost:3000/dashboard"> Open Campus Sphere </a>' // HTML body
+            html: '<p>There is new notice for you. This notice is sent by Campus Sphere.</p>, <a href="https://campus-sphere-frontend.onrender.com/dashboard"> Open Campus Sphere </a>' // HTML body
         };
 
         transporter.sendMail(mailOptions, (error, info) => {

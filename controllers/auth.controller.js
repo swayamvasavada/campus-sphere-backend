@@ -80,7 +80,7 @@ async function requestReset(req, res, next) {
             <body>
                 <p>Dear User,</p>
                 <p>We received a request to reset your password. If you made this request, please click the link below to reset your password:</p>
-                <p><a href="http://localhost:3000/reset-password/${resetToken}">Reset Password</a></p>
+                <p><a href="https://campus-sphere-frontend.onrender.com/reset-password/${resetToken}">Reset Password</a></p>
                 <p>The link will expire in 15 minutes. If you did not request a password reset, you can safely ignore this email.</p>
                 <p>Best regards,<br>Campus Sphere</p>
             </body>
