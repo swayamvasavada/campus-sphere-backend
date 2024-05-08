@@ -87,7 +87,7 @@ async function registerUser(req, res, next) {
                 <td bgcolor="#ffffff" style="padding: 40px 30px;">
                     <p>Dear John,</p>
                     <p>Thank you for registering with us. Your account has been successfully created.</p>
-                    <p>You can now <a href="http://localhost:5000/login">login here</a> to start exploring our services.</p>
+                    <p>You can now <a href="http://https://campus-sphere-frontend.onrender.com/login">login here</a> to start exploring our services.</p>
                     <p>If you have any questions or need further assistance, feel free to contact us.</p>
                     <p>Best regards,<br>Example Company</p>
                 </td>
