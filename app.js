@@ -7,7 +7,8 @@ const batchRoutes = require('./routes/batch.routes');
 const deptRoutes = require('./routes/dept.routes');
 const libraryRoutes = require('./routes/library.routes');
 const noticeRoutes = require('./routes/notices.routes');
-// const enableCors = require('./middlewares/cors');
+const feesRoutes = require('./routes/fees.routes');
+const paymentHandleRoutes = require('./routes/fees-handle.routes');
 const cors = require('cors');
 const tokenVerification = require('./middlewares/jwt-verify');
 
@@ -18,13 +19,15 @@ app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(authRoutes);
-// app.use(tokenVerification);
+app.use(paymentHandleRoutes);
+app.use(tokenVerification);
 app.use('/enquiry', enquiryRoutes);
 app.use(userRoutes);
 app.use('/dept', deptRoutes);
 app.use('/batch', batchRoutes);
 app.use('/library', libraryRoutes);
 app.use('/notice', noticeRoutes);
+app.use('/fees', feesRoutes);
 
 app.use(function (error, req, res, next) {
     console.log(error);
