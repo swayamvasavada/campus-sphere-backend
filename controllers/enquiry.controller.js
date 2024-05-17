@@ -2,7 +2,6 @@ const db = require('../data/database');
 
 async function getAllEnquiries(req, res, next) {
     const enquiries = await db.getDb().collection('enquiries').find().toArray();
-    console.log(enquiries);
     res.json(enquiries);
 }
 

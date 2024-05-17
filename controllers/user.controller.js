@@ -32,7 +32,6 @@ async function getUser(req, res, next) {
     try {
         result = await User.fetchUser(userId);
     } catch (error) {
-        console.log(error);
         next();
         return;
     }
@@ -42,7 +41,6 @@ async function getUser(req, res, next) {
 
 async function registerUser(req, res, next) {
     const enteredData = req.body;
-    console.log("inserting");
     let result;
     try {
 
@@ -161,7 +159,6 @@ async function availableHOD(req, res, next) {
         return next();
     }
 
-    console.log(result);
     res.json(result);
 }
 
@@ -175,7 +172,6 @@ async function fetchAllStudents(req, res, next) {
         next();
     }
 
-    console.log(result);
     res.json(result);
 }
 

@@ -15,10 +15,6 @@ const transporter = nodemailer.createTransport({
 
 async function login(req, res, next) {
     const enteredData = req.body;
-
-    console.log("login");
-    console.log(enteredData);
-
     let userData;
     try {
         userData = await db.getDb().collection('users').findOne({ email: enteredData.email }, { projection: { _id: 1, email: 1, password: 1, desg: 1 } });
@@ -53,9 +49,6 @@ async function login(req, res, next) {
 async function requestReset(req, res, next) {
     const email = req.body.email;
     const userData = await db.getDb().collection('users').findOne({ email: email });
-
-    console.log(userData);
-    console.log(email);
 
     if (!userData) {
         return res.status(404).json({
@@ -202,7 +195,6 @@ async function resetPassword(req, res, next) {
         }
 
         userEmail = decode.email;
-        console.log(userEmail);
     });
 
     try {

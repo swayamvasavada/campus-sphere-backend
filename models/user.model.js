@@ -65,7 +65,6 @@ class User {
     static async fetchAvailableHOD(deptId) {
         let result;
         try {
-            console.log(deptId);
             result = await db.getDb().collection('users').find({ desg: "Faculty", deptId: new ObjectId(deptId) }, { projection: { name: 1 } }).toArray();
         } catch (error) {
             console.log(error);
@@ -147,7 +146,6 @@ class User {
             try {
                 return result = await db.getDb().collection('users').insertOne(data);
             } catch (error) {
-                console.log(result);
                 next();
                 return;
             }
