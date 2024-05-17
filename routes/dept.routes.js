@@ -11,7 +11,6 @@ router.get('/', async function (req, res, next) {
 
 router.get('/:deptId', async function (req, res, next) {
     const deptId = req.params.deptId;
-    console.log(deptId);
     const result = await db.getDb().collection('dept').findOne({ _id: new ObjectId(deptId) });
 
     res.json(result);
@@ -19,7 +18,6 @@ router.get('/:deptId', async function (req, res, next) {
 
 router.post('/create-dept', async function (req, res, next) {
     const deptData = req.body;
-    console.log(deptData);
     let result;
 
     try {

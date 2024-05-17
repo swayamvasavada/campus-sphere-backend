@@ -111,7 +111,6 @@ router.post('/issue-book/:bookId', async function (req, res, next) {
             const bookData = await db.getDb().collection('library').findOne({ _id: new ObjectId(bookId) });
 
             const result = await db.getDb().collection('library').updateOne({ _id: new ObjectId(bookId) }, { $set: { issuedBooks: bookData.issuedBooks + 1 } });
-            console.log(result);
         }
     } catch (error) {
         console.log(error);
@@ -122,16 +121,13 @@ router.post('/issue-book/:bookId', async function (req, res, next) {
 });
 
 router.post('/return-book/:bookId', async function (req, res, next) {
-    console.log('trying to delete');
     const bookId = req.params.bookId;
     let result;
 
     try {
         result = await db.getDb().collection('library.issued').deleteOne({ bookId: bookId });
 
-        console.log(result);
         if (result.deletedCount) {
-            console.log('trying to update record');
             const bookDetails = await db.getDb().collection('library').findOne({ _id: new ObjectId(bookId) });
             const libraryResult = await db.getDb().collection('library').updateOne({ _id: new ObjectId(bookId) }, { $set: { issuedBooks: bookDetails.issuedBooks - 1 } });
         }

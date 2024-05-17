@@ -66,8 +66,6 @@ router.get('/faculty-notices', async function (req, res, next) {
 
 router.post('/issue-notice', async function (req, res, next) {
     const formData = req.body;
-    console.log(res.locals);
-    console.log(res.locals.userId);
     let result;
     let noticeData;
     try {
@@ -88,7 +86,6 @@ router.post('/issue-notice', async function (req, res, next) {
     let users;
 
     if (noticeData.noticeLevel == 1) {
-        console.log('check 1');
         users = await db.getDb().collection('users').find({ $or: [{ desg: "Student" }, { desg: "Faculty" }] }).toArray();
     }
 
