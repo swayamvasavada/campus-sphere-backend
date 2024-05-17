@@ -34,7 +34,7 @@ router.post('/handle-success/:userId/:semesterNo/:fees/:penalty', async function
         next();
     }
 
-    res.redirect(303, 'http://localhost:3000/success');
+    res.redirect(303, `${process.env.FRONTEND_URL}/success`);
 });
 
 module.exports = router;
