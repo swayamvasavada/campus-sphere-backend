@@ -10,6 +10,8 @@ async function checkRole(userId) {
 }
 
 function verifyToken(req, res, next) {
+    console.log("Cookies: ", req.cookies);
+    
     let authCredentials = req.cookies["authToken"];
     
     if (!authCredentials) {
