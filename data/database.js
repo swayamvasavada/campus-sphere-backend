@@ -12,6 +12,10 @@ async function connect() {
     database = client.db('campus-sphere');
 }
 
+/**
+ * 
+ * @returns {import('mongodb').Db}
+ */
 function getDb() {
     if (!database) {
         throw {
