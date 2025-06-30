@@ -28,9 +28,8 @@ class User {
         try {
             result = await db.getDb().collection('users').find().toArray();
         } catch (error) {
-            console.log(error);
-            next();
-            return;
+            console.log("Error: ", error);
+            throw error;
         }
 
         return result;
@@ -39,37 +38,40 @@ class User {
     static async fetchUser(userId) {
         let result;
         try {
-            result = await db.getDb().collection('users').findOne({_id: new ObjectId(userId)});
+            result = await db.getDb().collection('users').findOne({ _id: new ObjectId(userId) });
+
+            const deptData = await db.getDb().collection('dept').findOne({ _id: new ObjectId(result.dept) });
+            result.dept = deptData;
+
+            const batchData = await db.getDb().collection('batch').findOne({ _id: new ObjectId(result.batch) });
+            result.batch = batchData;
         } catch (error) {
-            console.log(error);
-            next();
-            return;
+            console.log("Error: ", error);
+            throw error;
         }
 
         return result;
     }
 
-    static async fetchAvailableMentor(deptId) {
-        let result;
+    static async fetchDeptUser(deptId) {
         try {
-            result = await db.getDb().collection('users').find({ desg: "Faculty", mentoring: null, deptId: new ObjectId(deptId) }, { projection: { name: 1 } }).toArray();
-        } catch (error) {
-            console.log(error);
-            next();
-            return;
-        }
+            const result = await db.getDb().collection('users').find({ dept: new ObjectId(deptId) }).toArray();
+            console.log("Users: ", result);
 
-        return result;
+            return result;
+        } catch (error) {
+            throw error;
+        }
     }
 
-    static async fetchAvailableHOD(deptId) {
+    static async fetchSummary() {
         let result;
+
         try {
-            result = await db.getDb().collection('users').find({ desg: "Faculty", deptId: new ObjectId(deptId) }, { projection: { name: 1 } }).toArray();
+            result = await db.getDb().collection('users').countDocuments();
         } catch (error) {
-            console.log(error);
-            next();
-            return;
+            console.log("Error: ", error);
+            throw error;
         }
 
         return result;
@@ -82,7 +84,7 @@ class User {
             result = await db.getDb().collection('users').find({ desg: "Student" }).sort({ name: 1 }).toArray();
         } catch (error) {
             console.log(error);
-            next();
+            throw error;
         }
 
         return result;
@@ -97,14 +99,18 @@ class User {
                 name: { firstName: this.firstName, lastName: this.lastName },
                 middleName: this.middleName,
                 address: { colonyName: this.colony, landmark: this.landmark, area: this.area, city: this.city, pincode: this.pincode },
-                dob: new Date(this.date),
+                dob: new Date(this.dob),
                 gender: this.gender,
                 email: this.email,
                 contact: { primaryNo: this.primaryNo, alternativeNo: this.alternateNo },
                 desg: this.desg,
-                dept: this.dept
+                dept: new ObjectId(this.dept)
             };
 
+            if (this.desg === "Student") {
+                data.batch = batch;
+            }
+            
             const result = db.getDb().collection('users').updateOne({ _id: new ObjectId(this.id) }, { $set: data });
 
             return result;
@@ -126,7 +132,7 @@ class User {
                 name: { firstName: this.firstName, lastName: this.lastName },
                 middleName: this.middleName,
                 address: { colonyName: this.colony, landmark: this.landmark, area: this.area, city: this.city, pincode: this.pincode },
-                dob: new Date(this.date),
+                dob: new Date(this.dob),
                 doj: new Date(),
                 gender: this.gender,
                 email: this.email,
@@ -135,22 +141,48 @@ class User {
                 desg: this.desg,
             };
             if (this.desg == "Student" || this.desg == "Faculty") {
-                data.deptId = new ObjectId(this.dept)
+                data.dept = new ObjectId(this.dept)
             }
             if (this.desg == "Student") {
                 data.batch = batch;
             }
+
+            console.log(data);
+
 
             let result;
 
             try {
                 return result = await db.getDb().collection('users').insertOne(data);
             } catch (error) {
-                next();
-                return;
+                console.log("Error: ", error);
+                throw error;
             }
         }
 
+    }
+
+    static async updatePassword(newPassword, userId) {
+        let result;
+        try {
+            const hashedPassword = await bcrypt.hash(newPassword, 12);
+            result = db.getDb().collection('users').updateOne({ _id: new ObjectId(userId) }, { $set: { password: hashedPassword } });
+            return result;
+        } catch (error) {
+            console.log("Error: ", error);
+            throw error;
+        }
+    }
+
+    static async deleteUser(userId) {
+        let result;
+
+        try {
+            result = await db.getDb().collection('users').deleteOne({ _id: new ObjectId(userId) });
+            return result;
+        } catch (error) {
+            throw error;
+        }
     }
 }
 
