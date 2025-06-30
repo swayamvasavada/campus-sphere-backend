@@ -1,6 +1,8 @@
-const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
+const bcrypt = require('bcryptjs');
+const nodemailer = require('nodemailer');
 
+const db = require('../data/database');
 const User = require('../models/user.model');
 
 dotenv.config()
@@ -14,41 +16,119 @@ const transporter = nodemailer.createTransport({
 })
 
 async function getAllUser(req, res, next) {
+    if (res.locals.desg !== "Admin") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Admin can access this data"
+    });
+
     let result;
     try {
         result = await User.fetchAll();
     } catch (error) {
         console.log(error);
-        next();
+        next(error);
         return;
     }
 
-    res.json(result);
+    res.json({
+        hasError: false,
+        data: result
+    });
 }
 
 async function getUser(req, res, next) {
     const userId = req.params.id;
+
+    if (userId !== res.locals.userId && res.locals.desg !== "Admin") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Admin can access this data"
+    });
+
     let result;
     try {
         result = await User.fetchUser(userId);
     } catch (error) {
-        next();
+        next(error);
         return;
     }
 
-    res.json(result);
+    res.json({
+        hasError: false,
+        data: result
+    });
+}
+
+async function getUserInfo(req, res, next) {
+    let result;
+
+    try {
+        result = await User.fetchUser(res.locals.userId);
+    } catch (error) {
+        next(error);
+    }
+
+    return res.json({
+        hasError: false,
+        data: result
+    });
+}
+
+async function getDeptUser(req, res, next) {
+    if (res.locals.desg !== "Admin" && res.locals.desg !== "Librarian") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Admin and Librarian can access this data"
+    });
+
+    const deptId = req.params.deptId;
+    let result;
+    try {
+        result = await User.fetchDeptUser(deptId);
+    } catch (error) {
+        next(error);
+    }
+
+    return res.json({
+        hasError: false,
+        data: result
+    });
+}
+
+async function getSummary(req, res, next) {
+    if (res.locals.desg !== "Admin") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Admin can access this data"
+    });
+    let result = {};
+
+    try {
+        result.studentCount = await db.getDb().collection('users').countDocuments({desg: "Student"});
+        result.facultyCount = await db.getDb().collection('users').countDocuments({desg: "Faculty"});
+        result.nonTeachingCount = await db.getDb().collection('users').countDocuments({$or: [{desg: "Admin"}, {desg: "Librarian"}]});
+    } catch (error) {
+        console.log("Error: ", error);
+        next(error);
+    }
+
+    return res.json({
+        hasError: false,
+        result: result
+    });
 }
 
 async function registerUser(req, res, next) {
+    if (res.locals.desg !== "Admin") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Admin can access this data"
+    });
+
     const enteredData = req.body;
     let result;
     try {
-
         const userData = new User({ ...enteredData });
         result = await userData.saveUser(enteredData.batch);
     } catch (error) {
         console.log(error);
-        return next();
+        return next(error);
     }
 
     const mailOptions = {
@@ -116,60 +196,103 @@ async function registerUser(req, res, next) {
     res.json(result);
 }
 
-
 async function updateUser(req, res, next) {
     const enteredData = req.body;
     const userId = req.params.id;
+
+    if (!userId === res.locals.userId && res.locals.desg !== "Admin") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Admin can access this data"
+    });
 
     let result;
     try {
 
         const userData = new User({ ...enteredData }, userId);
-        result = await userData.saveUser();
+        result = await userData.saveUser(enteredData.batch);
     } catch (error) {
         console.log(error);
-        return next();
+        return next(error);
     }
 
-    res.json(result);
+    res.json({
+        hasError: false,
+        dataL: result
+    });
 }
 
-async function availableMentor(req, res, next) {
-    let result;
-    const deptId = req.params.deptId;
-
+async function updatePassword(req, res, next) {
     try {
-        result = await User.fetchAvailableMentor(deptId);
-    } catch (error) {
-        console.log(error);
-        return next()
-    }
+        if (req.body.password !== req.body['confirm-password']) {
+            return res.status(400).json({
+                hasError: true,
+                message: "Password and Confirm password are not same!"
+            });
+        }
 
-    res.json(result);
+        const userData = await User.fetchUser(res.locals.userId);
+        console.log("user data: ", userData);
+
+        const passwordMatched = await bcrypt.compare(req.body["current-password"], userData.password);
+
+        if (!passwordMatched) {
+            return res.status(400).json({
+                hasError: true,
+                message: "Current Password is incorrect"
+            });
+        }
+
+        const updateResult = await User.updatePassword(req.body.password, res.locals.userId);
+        console.log(updateResult);
+
+        if (updateResult.modifiedCount === 1) {
+            return res.json({
+                hasError: false,
+                message: "Password has been updated"
+            });
+        }
+    } catch (error) {
+        console.log("Error: ", error);
+        next(error);
+    }
 }
 
-async function availableHOD(req, res, next) {
-    const deptId = req.params.deptId;
+async function deleteUser(req, res, next) {
+    if (res.locals.desg !== "Admin") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Admin can access this data"
+    });
+
+    const userId = req.params.id;
     let result;
 
     try {
-        result = await User.fetchAvailableHOD(deptId);
-    } catch (error) {
-        console.log(error);
-        return next();
-    }
+        result = await User.deleteUser(userId);
 
-    res.json(result);
+        if (result.deletedCount) {
+            return res.json({
+                hasError: false,
+                message: "User deleted successfully!"
+            });
+        }
+    } catch (error) {
+        console.log("Error: ", error);
+        next(error);
+    }
 }
 
 async function fetchAllStudents(req, res, next) {
-    let result;
+    if (res.locals.desg !== "Admin") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Admin can access this data"
+    });
 
+    let result;
     try {
         result = await User.fetchAllStudents();
     } catch (error) {
         console.log(error);
-        next();
+        next(error);
     }
 
     res.json(result);
@@ -177,10 +300,13 @@ async function fetchAllStudents(req, res, next) {
 
 module.exports = {
     getUser: getUser,
+    getUserInfo: getUserInfo,
+    getDeptUser: getDeptUser,
     getAllUser: getAllUser,
+    getSummary: getSummary,
     registerUser: registerUser,
     updateUser: updateUser,
-    availableHOD: availableHOD,
-    availableMentor: availableMentor,
+    updatePassword: updatePassword,
+    deleteUser: deleteUser,
     fetchAllStudents: fetchAllStudents
 }
