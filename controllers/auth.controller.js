@@ -48,10 +48,8 @@ async function login(req, res, next) {
     res.cookie("authToken", JSON.stringify(payload), {
         maxAge: 24 * 60 * 60 * 1000,
         secure: true,
-        samSite: 'None'
+        sameSite: 'None'
     });
-    
-    
 
     res.json({
         desg: userData.desg
@@ -125,7 +123,7 @@ async function resetPassword(req, res, next) {
                 message: 'Reset link expired!'
             });
         }
-        
+
         userEmail = decode.email;
         console.log(userEmail);
     });
