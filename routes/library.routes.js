@@ -2,6 +2,7 @@ const nodemailer = require('nodemailer');
 const router = require('express').Router();
 const { ObjectId } = require('mongodb');
 const db = require('../data/database');
+const User = require('../models/user.model');
 
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -9,8 +10,9 @@ const transporter = nodemailer.createTransport({
         user: process.env.email,
         pass: process.env.password
     }
-})
+});
 
+// To get list of all books in library
 router.get('/', async function (req, res, next) {
     let result;
 
@@ -18,18 +20,198 @@ router.get('/', async function (req, res, next) {
         result = await db.getDb().collection('library').find().toArray();
     } catch (error) {
         console.log(error);
-        next();
+        next(error);
     }
 
-    res.json(result);
+    res.json({
+        hasError: false,
+        data: result
+    });
 });
 
-router.post('/add-books', async function (req, res, next) {
+router.get('/summary', async function (req, res, next) {
+    let result = {};
+
+    if (res.locals.desg === "Admin") {
+        try {
+            result = await db.getDb().collection('library').aggregate([{ $group: { _id: null, totalBooks: { $sum: "$totalBooks" } } }]).toArray();
+        } catch (error) {
+            next(error);
+        }
+
+        return res.json({
+            hasError: false,
+            data: result[0]
+        });
+    } else if (res.locals.desg === "Librarian") {
+        try {
+            result.totalBooks = await db.getDb().collection('library').countDocuments();
+            const totalNoBooks = await db.getDb().collection('library').aggregate([{ $group: { _id: null, totalNoBooks: { $sum: "$totalBooks" } } }]).toArray();
+            const totalIssued = await db.getDb().collection('library').aggregate([{ $group: { _id: null, totalIssued: { $sum: "$issuedBooks" } } }]).toArray();
+
+            result.totalNoBooks = totalNoBooks[0]["totalNoBooks"];
+            result.totalIssued = totalIssued[0]["totalIssued"];
+
+            return res.json({
+                hasError: false,
+                data: result
+            })
+        } catch (error) {
+            next(error);
+        }
+
+        return res.json({
+            hasError: false,
+            data: result
+        });
+    }
+
+    return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Personnel can access this data"
+    });
+})
+
+// To get details of issued books.
+router.get('/issued-books', async function (req, res, next) {
+    if (res.locals.desg !== "Librarian") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Librarian can access this data"
+    });
+
+    let result;
+    try {
+        result = await db.getDb().collection('library.issued').find().toArray();
+    } catch (error) {
+        console.log(error);
+        next(error);
+    }
+
+    res.json({
+        hasError: false,
+        data: result
+    });
+});
+
+// TO send auto remainder
+router.get('/auto-remainder', async function (req, res, next) {
+    const tomorrowStart = new Date();
+    tomorrowStart.setHours(24, 0, 0, 0);
+
+    const tomorrowEnd = new Date(tomorrowStart);
+    tomorrowEnd.setHours(23, 59, 59, 999);
+
+    let issuerList;
+    let result;
+    try {
+        issuerList = await db.getDb().collection('library.issued').find({ returnDate: { $gte: tomorrowStart, $lt: tomorrowEnd } }).toArray();;
+    } catch (error) {
+        next(error);
+    }
+
+    if (issuerList.length === 0) {
+        return res.json({
+            hasError: false,
+            message: "No remainders to send"
+        });
+    }
+
+    for (const issuer of issuerList) {
+        console.log("Issuer: ", issuer);
+
+        const userDetail = await User.fetchUser(issuer.userId);
+        const humanReadableDate = new Date(issuer.returnDate).toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+
+        let mailOptions = {
+            from: 'Campus Sphere Library',
+            to: userDetail.email,
+            subject: 'Reminder: Return Book Issued from Library',
+            html: `
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Library Book Reminder</title>
+                    <style>
+                        /* CSS styles from the HTML template */
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h2>Library Book Reminder</h2>
+                        <p>Dear ${userDetail.name.firstName + " " + userDetail.name.lastName},</p>
+                        <p>We hope this email finds you well.</p>
+                        <p>This is a friendly reminder regarding the book titled "<strong>${issuer.bookName}</strong>" that you borrowed from our library. As per our records, the due date for returning the book is <strong>${humanReadableDate}</strong>.</p>
+                        <p>We kindly request you to return the book by the due date to avoid any inconvenience. In case, you require an extension or have any concerns regarding the return, please don't hesitate to contact us at <strong>Library</strong>.</p>
+                        <p>Thank you for your cooperation in maintaining the smooth functioning of our library services.</p>
+                        <p>Best regards,</p>
+                        <p><strong>Campus Sphere</strong></p>
+                    </div>
+                </body>
+                </html>
+            `
+        };
+
+        transporter.sendMail(mailOptions, function (error, info) {
+            if (error) {
+                console.log(error);
+            } else {
+                console.log('Email sent: ' + info.response);
+            }
+        });
+    }
+
+    return res.json({
+        hasError: false,
+        message: "Reminder has been send!"
+    });
+});
+
+// To get details of specific book. Only Librarian can access.
+router.get('/:bookId', async function (req, res, next) {
+    if (res.locals.desg !== "Librarian") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Librarian can access this data"
+    });
+
+    const bookId = req.params.bookId;
+
+    try {
+        const result = await db.getDb().collection("library").findOne({ _id: new ObjectId(bookId) })
+        if (!result._id) {
+            return res.status(404).json({
+                hasError: true,
+                message: "Seems like this book has been deleted"
+            });
+        }
+
+        return res.json({
+            hasError: false,
+            data: result
+        });
+    } catch (error) {
+        next(error);
+    }
+})
+
+// To add books in library. It can only be accessed by Librarian
+router.post('/add-book', async function (req, res, next) {
+    if (res.locals.desg !== "Librarian") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Librarian can access this data"
+    });
+
     const formData = req.body;
     const bookData = {
         bookName: formData.bookName,
         author: formData.author,
-        totalBooks: formData.totalBooks,
+        totalBooks: +formData.totalBooks,
         issuedBooks: 0
     };
 
@@ -38,13 +220,19 @@ router.post('/add-books', async function (req, res, next) {
         result = await db.getDb().collection('library').insertOne(bookData);
     } catch (error) {
         console.log(error);
-        next();
+        next(error);
     }
 
     res.json(result);
 });
 
-router.post('/delete-books/:bookId', async function (req, res, next) {
+// To delete books from library book list. It can only be accessed by Librarian
+router.post('/delete-book/:bookId', async function (req, res, next) {
+    if (res.locals.desg !== "Librarian") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Librarian can access this data"
+    });
+
     const bookId = req.params.bookId;
     let result;
 
@@ -52,41 +240,45 @@ router.post('/delete-books/:bookId', async function (req, res, next) {
         result = await db.getDb().collection('library').deleteOne({ _id: new ObjectId(bookId) });
     } catch (error) {
         console.log(error);
-        next();
+        next(error);
     }
 
     res.json(result);
 });
 
-router.post('/update-record/:bookId', async function (req, res, next) {
+// To update book record in library book list. It can only be accessed by librarian
+router.post('/update-book/:bookId', async function (req, res, next) {
+    if (res.locals.desg !== "Librarian") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Librarian can access this data"
+    });
+
     const bookId = req.params.bookId;
-    const formData = req.body;
+    const bookData = {
+        bookName: req.body.bookName,
+        author: req.body.author,
+        totalBooks: +req.body.totalBooks,
+    };
 
     let result;
 
     try {
-        result = await db.getDb().collection('library').updateOne({ _id: new ObjectId(bookId) }, { $set: formData });
+        result = await db.getDb().collection('library').updateOne({ _id: new ObjectId(bookId) }, { $set: bookData });
     } catch (error) {
         console.log(error);
-        next();
+        next(error);
     }
 
     res.json(result);
 });
 
-router.get('/issued-books', async function (req, res, next) {
-    let result;
-    try {
-        result = await db.getDb().collection('library.issued').find().toArray();
-    } catch (error) {
-        console.log(error);
-        next();
-    }
-
-    res.json(result);
-});
-
+// To issue new book.
 router.post('/issue-book/:bookId', async function (req, res, next) {
+    if (res.locals.desg !== "Librarian") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Librarian can access this data"
+    });
+
     const bookId = req.params.bookId;
     const formData = req.body;
 
@@ -97,12 +289,23 @@ router.post('/issue-book/:bookId', async function (req, res, next) {
         const userDetails = await db.getDb().collection('users').findOne({ _id: new ObjectId(formData.userId) });
         const bookDetails = await db.getDb().collection('library').findOne({ _id: new ObjectId(bookId) });
 
+        if (bookDetails.totalBooks === bookDetails.issuedBooks) {
+            return res.status(409).json({
+                hasError: true,
+                message: 'This book is currently not available to issue!'
+            });
+        }
+
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 7);
+
         const issuerDetail = {
             bookId: bookId,
             bookName: bookDetails.bookName,
-            returnDate: formData.returnDate,
+            issuedOn: new Date(),
+            returnDate: dueDate,
             userId: formData.userId,
-            userName: userDetails.name.firstName + " " + userDetails.name.lastName
+            username: userDetails.name.firstName + " " + userDetails.name.lastName
         };
 
         result = await db.getDb().collection('library.issued').insertOne(issuerDetail);
@@ -110,38 +313,80 @@ router.post('/issue-book/:bookId', async function (req, res, next) {
         if (result.insertedId) {
             const bookData = await db.getDb().collection('library').findOne({ _id: new ObjectId(bookId) });
 
-            const result = await db.getDb().collection('library').updateOne({ _id: new ObjectId(bookId) }, { $set: { issuedBooks: bookData.issuedBooks + 1 } });
+            result = await db.getDb().collection('library').updateOne({ _id: new ObjectId(bookId) }, { $set: { issuedBooks: bookData.issuedBooks + 1 } });
         }
     } catch (error) {
         console.log(error);
-        next();
+        next(error);
     }
 
     res.json(result);
 });
 
-router.post('/return-book/:bookId', async function (req, res, next) {
-    const bookId = req.params.bookId;
+// To get issuer Detail
+router.get('/issuer-detail/:issuerId', async function (req, res, next) {
+    const issuerId = req.params.issuerId;
+    let issuerDetails, userDetails, bookDetails;
+    try {
+        issuerDetails = await db.getDb().collection('library.issued').findOne({ _id: new ObjectId(issuerId) });
+        userDetails = await db.getDb().collection('users').findOne({ _id: new ObjectId(issuerDetails.userId) });
+        bookDetails = await db.getDb().collection('library').findOne({ _id: new ObjectId(issuerDetails.bookId) });
+
+        const detpData = await db.getDb().collection('dept').findOne({ _id: new ObjectId(userDetails.dept) });
+        userDetails.dept = detpData;
+
+        const batchData = await db.getDb().collection('batch').findOne({ _id: new ObjectId(userDetails.batch) });
+        userDetails.batch = batchData;
+    } catch (error) {
+        next(error);
+    }
+
+    res.json({
+        hasError: false,
+        issuerDetails: issuerDetails,
+        userDetails: userDetails,
+        bookDetails: bookDetails
+    });
+});
+
+// To return the issued book.
+router.post('/return-book/:issuerId', async function (req, res, next) {
+    if (res.locals.desg !== "Librarian") return res.status(403).json({
+        hasError: true,
+        message: "Only Authorized Librarian can access this data"
+    });
+
+    const issuerId = req.params.issuerId;
+    console.log("Issuer id: ", issuerId);
+
     let result;
 
     try {
-        result = await db.getDb().collection('library.issued').deleteOne({ bookId: bookId });
+        const issuerData = await db.getDb().collection('library.issued').findOne({ _id: new ObjectId(issuerId) });
+        console.log("Issuer data: ", issuerData);
+
+        result = await db.getDb().collection('library.issued').deleteOne({ _id: new ObjectId(issuerId) });
+        console.log("Result: ", result);
 
         if (result.deletedCount) {
-            const bookDetails = await db.getDb().collection('library').findOne({ _id: new ObjectId(bookId) });
-            const libraryResult = await db.getDb().collection('library').updateOne({ _id: new ObjectId(bookId) }, { $set: { issuedBooks: bookDetails.issuedBooks - 1 } });
+            const bookDetails = await db.getDb().collection('library').findOne({ _id: new ObjectId(issuerData.bookId) });
+            const libraryResult = await db.getDb().collection('library').updateOne({ _id: new ObjectId(issuerData.bookId) }, { $set: { issuedBooks: bookDetails.issuedBooks - 1 } });
         }
     } catch (error) {
         console.log(error);
-        next();
+        next(error);
     }
 
-    res.json(result);
+    res.json({
+        hasError: false,
+        message: "Book has been returned!"
+    });
 });
 
+// To send remainder about issued book
 router.post('/reminder/:issueId', async function (req, res, next) {
     const issueId = req.params.issueId;
-    var result;
+    let result;
     try {
         const issueDetails = await db.getDb().collection('library.issued').findOne({ _id: new ObjectId(issueId) });
         const userDetails = await db.getDb().collection('users').findOne({ _id: new ObjectId(issueDetails.userId) });
@@ -150,7 +395,7 @@ router.post('/reminder/:issueId', async function (req, res, next) {
             month: 'short',
             day: 'numeric',
             year: 'numeric'
-        })
+        });
 
         let mailOptions = {
             from: 'Campus Sphere Library',
@@ -173,7 +418,7 @@ router.post('/reminder/:issueId', async function (req, res, next) {
                         <p>Dear ${userDetails.name.firstName + " " + userDetails.name.lastName},</p>
                         <p>We hope this email finds you well.</p>
                         <p>This is a friendly reminder regarding the book titled "<strong>${issueDetails.bookName}</strong>" that you borrowed from our library. As per our records, the due date for returning the book is <strong>${humanReadableDate}</strong>.</p>
-                        <p>We kindly request you to return the book by the due date to avoid any inconvenience. Should you require an extension or have any concerns regarding the return, please don't hesitate to contact us at <strong>Library</strong>.</p>
+                        <p>We kindly request you to return the book by the due date to avoid any inconvenience. In case, you require an extension or have any concerns regarding the return, please don't hesitate to contact us at <strong>Library</strong>.</p>
                         <p>Thank you for your cooperation in maintaining the smooth functioning of our library services.</p>
                         <p>Best regards,</p>
                         <p><strong>Campus Sphere</strong></p>
@@ -188,25 +433,28 @@ router.post('/reminder/:issueId', async function (req, res, next) {
             if (error) {
                 console.log(error);
                 result = {
+                    hasError: false,
                     message: 'Something went wrong while sending email!'
                 }
             } else {
                 console.log('Email sent: ' + info.response);
                 result = {
+                    hasError: false,
                     message: 'Reminder has been sent!'
                 }
 
-                return res.json(result);
             }
+            return res.json(result);
         });
 
     } catch (error) {
         console.log(error);
-        next();
+        next(error);
     }
 
 });
 
+// To view issued book details.
 router.get('/my-issues', async function (req, res, next) {
     const studentId = res.locals.userId;
     let result;
@@ -215,7 +463,7 @@ router.get('/my-issues', async function (req, res, next) {
         result = await db.getDb().collection('library.issued').find({ userId: studentId }).toArray();
     } catch (error) {
         console.log(error);
-        next();
+        next(error);
     }
 
     res.json(result);
