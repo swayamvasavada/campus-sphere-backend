@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const ObjectId = require('mongodb').ObjectId;
+const dotenv = require('dotenv').config();
 
 const db = require('../data/database');
 
@@ -9,15 +10,17 @@ async function checkRole(userId) {
 }
 
 function verifyToken(req, res, next) {
-    const token = req.headers['x-access-token'] || req.body.token;
+    let authCredentials = req.cookies["authToken"];
     
-    if (!token) {
-        return res.status(403).json({ message: 'Auth token unavailable!' });
+    if (!authCredentials) {
+        return res.status(401).json({ message: 'Auth token unavailable!' });
     }
-
+    
+    authCredentials = JSON.parse(authCredentials);
+    
     let decodedData;
 
-    jwt.verify(token, 'super-secret', async function (err, decode) {
+    jwt.verify(authCredentials.token, process.env.JWT_SECRET, async function (err, decode) {
         if (err) {
             console.log(err);
             return res.status(401).json({ message: 'Unauthorised user!' });
