@@ -45,16 +45,10 @@ async function login(req, res, next) {
         desg: userData.desg
     }
     console.log(payload);
-    res.cookie("authToken", JSON.stringify(payload), {
-        maxAge: 24 * 60 * 60 * 1000,
-        secure: true,
-        sameSite: 'None',
-        path: '/',
-        httpOnly: false
-    });
 
     res.json({
-        desg: userData.desg
+        hasError: false,
+        payload: payload
     });
 }
 
