@@ -47,7 +47,7 @@ async function login(req, res, next) {
     console.log(payload);
     res.cookie("authToken", JSON.stringify(payload), {
         maxAge: 24 * 60 * 60 * 1000,
-        httpOnly: true,
+        httpOnly: process.env.status === "production",
         secure: true,
         sameSite: "None",
         path: "/"
