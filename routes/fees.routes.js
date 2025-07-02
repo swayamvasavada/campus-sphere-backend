@@ -33,7 +33,10 @@ router.get('/pending-fees', async function (req, res, next) {
     let result;
 
     try {
+        console.log("Userid: ", res.locals.userId);
         const userData = await db.getDb().collection('users').findOne({ _id: new ObjectId(res.locals.userId) });
+        console.log("Userdata: ", userData);
+        
         result = await db.getDb().collection('batch').findOne({ _id: new ObjectId(userData.batch) });
         console.log("result: ", result);
 
