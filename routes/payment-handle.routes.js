@@ -59,7 +59,7 @@ router.post('/handle-success/:sessionId', async function (req, res, next) {
         next(error);
     }
 
-    res.redirect(303, `${process.env.FRONTEND_URL}/success`);
+    res.redirect(303, `${process.env.FRONTEND_URL}/fees/success`);
 });
 
 module.exports = router;
