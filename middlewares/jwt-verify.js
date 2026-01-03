@@ -10,9 +10,9 @@ async function checkRole(userId) {
 }
 
 function verifyToken(req, res, next) {
-    console.log("Cookies: ", req.cookies);
+    // console.log("Headers: ", req.headers);
     
-    let authCredentials = req.cookies["authToken"];
+    let authCredentials = req.headers['authorization'];
     
     if (!authCredentials) {
         return res.status(401).json({ message: 'Auth token unavailable!' });
