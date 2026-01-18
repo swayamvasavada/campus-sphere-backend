@@ -12,7 +12,7 @@ async function checkRole(userId) {
 function verifyToken(req, res, next) {
     // console.log("Headers: ", req.headers);
     
-    let authCredentials = req.headers['authorization'];
+    let authCredentials = req.headers['authorization'] || req.body["authToken"];
     
     if (!authCredentials) {
         return res.status(401).json({ message: 'Auth token unavailable!' });

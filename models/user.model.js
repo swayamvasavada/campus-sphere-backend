@@ -115,7 +115,8 @@ class User {
 
             return result;
         } else {
-
+            console.log("Saving");
+            
             // Creating new user
             const existingUser = await db.getDb().collection('users').findOne({ email: this.email });
 
@@ -150,10 +151,8 @@ class User {
             console.log(data);
 
 
-            let result;
-
             try {
-                return result = await db.getDb().collection('users').insertOne(data);
+                return await db.getDb().collection('users').insertOne(data);
             } catch (error) {
                 console.log("Error: ", error);
                 throw error;

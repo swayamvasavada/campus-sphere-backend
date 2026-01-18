@@ -73,7 +73,7 @@ async function requestReset(req, res, next) {
     try {
         const resetToken = jwt.sign({ email: userData.email }, 'super-secret', { expiresIn: 15 * 60 });
         const mailOptions = {
-            from: 'Campus Sphere Technical Team',
+            from: '"Campus Sphere Technical Team" <recoveryteam@campus.sphere.com>',
             to: email,
             subject: 'Reset link for password!',
             html: `<!DOCTYPE html>
