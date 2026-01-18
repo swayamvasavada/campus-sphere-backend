@@ -115,8 +115,7 @@ class User {
 
             return result;
         } else {
-            console.log("Saving");
-            
+
             // Creating new user
             const existingUser = await db.getDb().collection('users').findOne({ email: this.email });
 

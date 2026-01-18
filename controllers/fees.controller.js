@@ -13,7 +13,7 @@ async function fetchSummary(req, res, next) {
     let result;
 
     try {
-        const today = new Date("2025-07-08");
+        const today = new Date();
         const startDate = new Date();
         startDate.setDate(today.getDate() - 30);
 
